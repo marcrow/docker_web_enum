@@ -1,16 +1,21 @@
-# Dockerfile pour Prefect Hunter - passive & active tools
-# Base builder pour compiler les outils Go
-FROM golang:1.24-bullseye AS builder
+# Dockerfile.custom
+FROM prefecthq/prefect:3.4.3-python3.12
 
-ENV GO111MODULE=on \
-    CGO_ENABLED=0 \
-    GOBIN=/go/bin \
-    PATH=$GOBIN:$PATH
-
+# Installer dépendances système et Go
+USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
-unzip \
-git \
-&& rm -rf /var/lib/apt/lists/*
+        ca-certificates curl git build-essential wget unzip golang-go \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installer prefect-shell (et donc prefect si nécessaire) et ses dépendances
+RUN pip install --no-cache-dir "prefect[shell]"
+
+# Enregistrer les blocks prefect-shell
+RUN prefect block register -m prefect_shell
+
+# Installer assetfinder, subfinder, massdns, dnsx, nuclei dans /opt/tools
+ENV GOBIN=/opt/tools
+RUN mkdir -p /opt/tools
 
 # 1. Installer assetfinder v0.1.1 (dernier au 26/01/2025)
 RUN go install github.com/tomnomnom/assetfinder@v0.1.1
@@ -22,45 +27,24 @@ RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.7.1
 WORKDIR /go/src/blechschmidt/massdns
 RUN git clone --depth 1 --branch v1.1.0 https://github.com/blechschmidt/massdns.git . \
     && make \
-    && cp bin/massdns /go/bin
+    && cp bin/massdns /opt/tools
 
 # 4. Installer nuclei v3.4.4 (dernier au 16/05/2025)
 RUN wget -qO /tmp/nuclei.zip -L \
 https://github.com/projectdiscovery/nuclei/releases/download/v3.4.4/nuclei_3.4.4_linux_amd64.zip \
-    && unzip /tmp/nuclei.zip -d /go/bin \
+    && unzip /tmp/nuclei.zip -d /opt/tools \
     && rm /tmp/nuclei.zip
 
 # 5. Installer dnsx v1.2.2 (dernier au 02/03/2025)
 RUN wget -qO /tmp/dnsx.zip -L \
     https://github.com/projectdiscovery/dnsx/releases/download/v1.2.2/dnsx_1.2.2_linux_amd64.zip \
-    && unzip -o /tmp/dnsx.zip -d /go/bin \
+    && unzip -o /tmp/dnsx.zip -d /opt/tools \
     && rm /tmp/dnsx.zip
 
 
-# 6. Placeholder pour ajouter ffuf (dernier au jour J, ex : v2.0.0)
-# RUN go install github.com/ffuf/ffuf@latest
+# Ajouter /opt/tools dans le PATH
+ENV PATH="/opt/tools:${PATH}"
 
-# Création de l’image finale minimale
-FROM debian:bullseye-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    git \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV PATH=/opt/tools:$PATH
-RUN mkdir -p /opt/tools
-
-# Copie des binaires compilés depuis builder
-COPY --from=builder /go/bin/assetfinder /opt/tools/
-COPY --from=builder /go/bin/subfinder /opt/tools/
-COPY --from=builder /go/bin/massdns /opt/tools/
-COPY --from=builder /go/bin/nuclei /opt/tools/
-COPY --from=builder /go/bin/dnsx /opt/tools/
-# COPY --from=builder /go/bin/ffuf /opt/tools/    <-- décommenter si ajouté ultérieurement
-
-WORKDIR /workspace
-
-# Entrypoint neutre ; remplacé par chaque commande via "docker exec"
-ENTRYPOINT ["/bin/bash"]
+# Repasser à l’utilisateur non-root (selon l’image prefect)
+USER chromatography
