@@ -53,7 +53,3 @@ RUN wget -qO /tmp/dnsx.zip -L \
 
 # Ajouter /opt/tools dans le PATH
 ENV PATH="/opt/tools:${PATH}"
-
-
-# Repasser à l’utilisateur non-root (selon l’image prefect)
-USER chromatography
