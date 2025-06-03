@@ -53,3 +53,6 @@ RUN wget -qO /tmp/dnsx.zip -L \
 
 # Ajouter /opt/tools dans le PATH
 ENV PATH="/opt/tools:${PATH}"
+
+COPY ../../repo /opt/prefect/repo
+WORKDIR /opt/prefect
