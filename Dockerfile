@@ -4,8 +4,17 @@ FROM prefecthq/prefect:3.4.3-python3.12
 # Installer dépendances système et Go
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates curl git build-essential wget unzip golang-go \
+        ca-certificates curl git build-essential wget unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Go 1.22.3 (or latest stable)
+RUN wget https://go.dev/dl/go1.22.3.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.22.3.linux-amd64.tar.gz && \
+    rm go1.22.3.linux-amd64.tar.gz
+
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+ENV GO111MODULE=on
 
 # Installer prefect-shell (et donc prefect si nécessaire) et ses dépendances
 RUN pip install --no-cache-dir "prefect[shell]"
